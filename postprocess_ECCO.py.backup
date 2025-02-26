@@ -1,0 +1,206 @@
+with open("shared_header.py", "rb") as source_file:
+    code = compile(source_file.read(), "shared_header.py", "exec")
+exec(code)
+import pandas as pd
+import numpy as np
+import argparse
+import ECCO_helper, ECCO_computeTendency
+import xarray as xr
+import postprocess_ECCO_tools
+
+parser = argparse.ArgumentParser(
+                    prog = 'postprocess_ECCO.py',
+                    description = 'Postprocess ECCO data (Mixed-Layer integrated).',
+)
+
+parser.add_argument('--MLD-method', required=True, help="If set then use ECCO MLD instead.", type=str, choices=["RHO", "FIXED500m"])
+parser.add_argument('--nproc', type=int, default=2)
+args = parser.parse_args()
+print(args)
+
+output_root_dir = "data/ECCO_LLC"
+
+MLD_dev = 0.03
+
+
+
+def ifSkip(dt):
+
+    skip = False
+
+    if 5 <= dt.month and dt.month <= 8 :
+        skip = True
+ 
+    # We need extra days to compute dSST/dt
+    if dt.month == 4 and dt.day != 1:
+        skip = True
+ 
+    if dt.month == 9 and dt.day != 30:
+        skip = True
+
+
+    return skip
+
+
+
+
+def work(dt):
+
+   
+    y = dt.year
+    m = dt.month
+    d = dt.day
+
+    time_now_str = dt.strftime("%Y-%m-%d")
+
+    if ifSkip(dt):
+        
+        print("Skip the date: %s" % (time_now_str,))
+        return    
+
+    global args
+    if args.MLD_method == "FIXED500m":
+        
+        extra_dirsuffix = "_500m"
+
+    else:
+        
+        extra_dirsuffix = ""
+    
+        
+    print("[%s] Work starts." % (time_now_str,))
+    # Phase 1    
+    # This one is computing G terms for each grid cell. Does not depend on MLD_method.
+    _tmp = ECCO_helper.getECCOFilename("Gs_ttl", "DAILY", dt)
+    output_filename_G_terms = "%s/%s/%s" % (output_root_dir, _tmp[0], _tmp[1])
+
+    if os.path.isfile(output_filename_G_terms):
+        print("[%s] File %s already exists. Skip." % (time_now_str, output_filename_G_terms))
+
+    else:
+        print("[%s] File %s does not exist, making it." % (time_now_str, output_filename_G_terms))
+        dir_name = os.path.dirname(output_filename_G_terms)
+        if not os.path.isdir(dir_name):
+            print("Create dir: %s" % (dir_name,))
+            Path(dir_name).mkdir(parents=True, exist_ok=True)
+        
+        
+        print("[%s] Now computing G terms..." % (time_now_str,))
+        
+        tends = ECCO_computeTendency.computeTendency(dt)
+
+        ds = xr.Dataset(data_vars={})
+        for varname, G in tends.items():
+            ds[varname] = G
+
+        ds.time.encoding = {}
+        ds.reset_coords(drop=True)
+
+        print("Output: ", output_filename_G_terms)
+        ds.to_netcdf(output_filename_G_terms, format='NETCDF4')
+        ds.close()
+       
+    """
+    # Phase 2
+    # This one computes the advection. Does not depend on MLD_method.
+    _tmp = ECCO_helper.getECCOFilename("HADV_g", "DAILY", dt)
+    output_filename_ADV = "%s/%s/%s" % (output_root_dir, _tmp[0], _tmp[1])
+    
+    dir_name = os.path.dirname(output_filename_ADV)
+    if not os.path.isdir(dir_name):
+        print("Create dir: %s" % (dir_name,))
+        Path(dir_name).mkdir(parents=True, exist_ok=True)
+    
+    if os.path.isfile(output_filename_ADV):
+        print("[%s] File %s already exists. Skip." % (time_now_str, output_filename_ADV))
+
+    else:
+        print("[%s] Now compute the advection." % (time_now_str, ))
+        
+        ds = ECCO_computeTendency.computeTendencyAdv(dt)
+        print("Output: ", output_filename_ADV)
+        ds.to_netcdf(output_filename_ADV, format='NETCDF4')
+    """
+
+    # Phase 3
+    # This one computes the mixed-layer integrated quantities
+    _tmp = ECCO_helper.getECCOFilename("MLT", "DAILY", dt, extra_dirsuffix=extra_dirsuffix)
+    output_filename_MXLANA = "%s/%s/%s" % (output_root_dir, _tmp[0], _tmp[1])
+    
+    dir_name = os.path.dirname(output_filename_MXLANA)
+    if not os.path.isdir(dir_name):
+        print("Create dir: %s" % (dir_name,))
+        Path(dir_name).mkdir(parents=True, exist_ok=True)
+  
+    if Path(output_filename_MXLANA).exists():
+ 
+        print("[%s] File %s already exists. Skip." % (time_now_str, output_filename_MXLANA))
+
+    else:
+         
+        print("[%s] Now compute the mixed-layer integrated quantities. Method = %s" % (time_now_str, args.MLD_method))
+        
+        if args.MLD_method == "RHO":
+            fixed_MLD = -1.0
+
+        elif args.MLD_method == "FIXED500m":
+            fixed_MLD = 500.0
+
+        
+        postprocess_ECCO_tools.processECCO(
+            dt,
+            output_filename_MXLANA,
+            fixed_MLD=fixed_MLD, 
+        ) 
+
+
+    print("[%s] Job done." % (time_now_str,))
+
+
+
+    return time_now_str, 1
+
+
+failed_dates = []
+with Pool(processes=args.nproc) as pool:
+
+    dts = pd.date_range(beg_time.strftime("%Y-%m-%d"), end_time.strftime("%Y-%m-%d"), inclusive="both")
+
+    for result in pool.map(work, dts):
+
+        print(result)
+
+    """
+    while True:
+
+        ok = False
+        if i == len(jobs):
+            print("All jobs return. Stop iteration.")
+            break
+
+        try:
+
+            print("Fetch job %s" % (jobs[i].time_now_str,))
+            r = result.next(timeout=30)
+            ok = True
+
+        except multiprocessing.TimeoutError as e:
+            print("[%s] Timeout before file is generated. Job fails." % jobs[i].time_now_str)
+            
+        except StopIteration:
+
+            # It seems this never happens. The function next is not well made
+            print("StopIteration occurs.")
+            break
+
+        if not ok:
+            failed_dates.append(jobs[i].time_now_str)
+
+        i += 1
+    """
+
+print("Tasks finished.")
+
+print("Failed dates: ")
+for i, failed_date in enumerate(failed_dates):
+    print("%d : %s" % (i+1, failed_date,))
