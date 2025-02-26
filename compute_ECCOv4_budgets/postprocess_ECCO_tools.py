@@ -7,7 +7,7 @@ import ecco_v4_py as ecco
 
 import numpy as np
 import netCDF4
-import earth_constants as ec
+#import earth_constants as ec
 import calculus_tools
 
 from datetime import (datetime, timedelta)
