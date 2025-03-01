@@ -85,7 +85,7 @@ if __name__ == "__main__":
             )
         )
 
-        output_file = output_dir / "mask_ERA5.nc"
+        output_file = output_dir / "regrid_ERA5.nc"
         print("Output file: ", output_file)
         ERA5_regrid_ds.to_netcdf(output_file)
 
@@ -115,6 +115,6 @@ if __name__ == "__main__":
             )
         )
 
-        output_file = output_dir / "mask_ECCO.nc"
+        output_file = output_dir / "regrid_ECCO.nc"
         print("Output file: ", output_file)
         ECCO_regrid_ds.to_netcdf(output_file)

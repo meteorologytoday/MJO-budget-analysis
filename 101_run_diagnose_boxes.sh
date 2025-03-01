@@ -1,10 +1,12 @@
 #!/bin/bash
 
-. pretty_latlon.sh
+source 00_setup.sh
+source tools/pretty_latlon.sh
 
-ncpu=1
+nproc=4
 
-output_root=output_regrid
+
+output_root=$gendata_dir/regrid
 
 beg_year=1993
 end_year=2017
@@ -17,8 +19,11 @@ spatial_rngs=(
 nparms=6
 
 
-mask_ERA5="./mask/mask_ERA5.nc"
-mask_ECCO="./mask/mask_ECCO.nc"
+mask_ERA5=$gendata_dir/mask/mask_ERA5.nc
+mask_ECCO=$gendata_dir/mask/mask_ECCO.nc
+
+regrid_file_ERA5=$gendata_dir/regrid_files/regrid_ERA5.nc
+regrid_file_ECCO=$gendata_dir/regrid_files/regrid_ECCO.nc
 
 mkdir -p mask
 
@@ -55,20 +60,20 @@ for i in $( seq 1 $(( ${#spatial_rngs[@]} / $nparms )) ); do
 
     mkdir -p $output_dir
 
-    eval "python3 construct_timeseries_by_boxes_parallel.py \\
-        --beg-year=$beg_year        \\
-        --end-year=$end_year        \\
-        --lat-rng $lat_min $lat_max \\
-        --lon-rng $lon_min $lon_max \\
-        --lat-nbox $lat_nbox        \\
-        --lon-nbox $lon_nbox        \\
-        --mask-ERA $mask_ERA5       \\
-        --mask-ECCO $mask_ECCO      \\
-        --ignore-empty-box          \\
-        --output-dir $output_dir    \\
-        --ERA-type ERA5             \\
-        --ncpu $ncpu 
-    "
-    wait
+    python3 compute_regrid_budget/construct_timeseries_by_boxes_parallel.py \
+        --beg-year=$beg_year        \
+        --end-year=$end_year        \
+        --output-dir $output_dir    \
+        --lat-rng $lat_min $lat_max \
+        --lon-rng $lon_min $lon_max \
+        --lat-nbox $lat_nbox        \
+        --lon-nbox $lon_nbox        \
+        --mask-ERA $mask_ERA5       \
+        --mask-ECCO $mask_ECCO      \
+        --regrid-file-ERA5 $regrid_file_ERA5 \
+        --regrid-file-ECCO $regrid_file_ECCO \
+        --ignore-empty-box          \
+        --ERA-type ERA5             \
+        --nproc $nproc 
 
 done

@@ -1,8 +1,33 @@
 import numpy as np
 import operator
+import xarray as xr
+from functools import reduce
+import scipy.sparse as sparse
 
-def constructAvgMtx(lat_idx, lon_idx, nbox_lat, nbox_lon):
-     
+def loadRegridInfo(regrid_file):
+
+    ds_regrid = xr.load_dataset(regrid_file)
+
+    lat_idx = ds_regrid["lat_idx"].to_numpy()
+    lon_idx = ds_regrid["lon_idx"].to_numpy()
+
+    lat_regrid_bnds = ds_regrid["lat_regrid_bnd"].to_numpy()   
+    lon_regrid_bnds = ds_regrid["lon_regrid_bnd"].to_numpy()   
+
+    lat_regrid = (lat_regrid_bnds[1:] + lat_regrid_bnds[:-1])/2
+    lon_regrid = (lon_regrid_bnds[1:] + lon_regrid_bnds[:-1])/2
+    
+    regrid_shape = (len(lat_regrid), len(lon_regrid))
+    
+    regrid_info = constructAvgMtx(lat_idx, lon_idx, lat_regrid, lon_regrid)
+
+    return regrid_info
+
+
+def constructAvgMtx(lat_idx, lon_idx, lat_regrid, lon_regrid):
+    
+    nbox_lat = len(lat_regrid)
+    nbox_lon = len(lon_regrid) 
     original_shape = lat_idx.shape
     original_total_grids = reduce(operator.mul, original_shape)
     
@@ -45,6 +70,8 @@ def constructAvgMtx(lat_idx, lon_idx, nbox_lat, nbox_lon):
         avg_mtx = avg_mtx,
         shape_original = original_shape,
         shape_regrid = (nbox_lat, nbox_lon),
+        lat = lat_regrid,
+        lon = lon_regrid,
     )
 
     return regrid_info
@@ -53,7 +80,7 @@ def regrid(regrid_info, arr):
     
     flattened_arr = np.array(arr).flatten()
 
-    if len(flattened_arr) != regrid_info["shape_original"][0] * regrid_info["shape_original"][1]:
+    if len(flattened_arr) != reduce(operator.mul, regrid_info["shape_original"]):
         raise Exception("Dimension of input array does not match avg_info.")
     
     result = regrid_info["avg_mtx"] @ np.array(arr).flatten()
