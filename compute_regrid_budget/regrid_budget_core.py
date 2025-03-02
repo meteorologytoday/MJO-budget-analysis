@@ -130,7 +130,7 @@ def main(
     print("Beg: ", beg_date)
     print("End: ", end_date)
 
-    dts = pd.date_range(beg_date, end_date, freq="D", inclusive="both")
+    dts = pd.date_range(beg_date, end_date, freq="D", inclusive="left")
     total_days = len(dts)
 
     ECCO_varnames = [

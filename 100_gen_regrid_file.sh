@@ -12,7 +12,7 @@ python3 compute_regrid_budget/gen_regrid_file.py \
     --ECCO-file $ECCO_file   \
     --ERA5-file $ERA5_file   \
     --lat-rng   -31 31       \
-    --lon-rng   100 260      \
+    --lon-rng   0   360      \
     --dlat 2                 \
     --dlon 2                 \
     --output-dir $gendata_dir/regrid_files
