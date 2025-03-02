@@ -67,8 +67,8 @@ def addAxesNextToAxes(
         new_pos = (
             pos.x0,
             pos.y0 - thickness_ratio - spacing_ratio,
+            pos.width,
             thickness_ratio,
-            pos.height,
         )
  
     return fig.add_axes(new_pos)
