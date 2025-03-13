@@ -38,6 +38,7 @@ for i in $( seq 1 $(( ${#params[@]} / $nparms )) ); do
         --input-dir  $input_dir            \
         --output-dir $output_dir           \
         --moving-avg-days $moving_avg_days \
+        --vertical-layers-needed 20        \
         --nproc $nproc 
 
 done

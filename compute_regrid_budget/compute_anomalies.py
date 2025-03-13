@@ -20,7 +20,7 @@ def loadDatasets(input_dir, years, file_fmt="ocean_budget_stat_{year:04d}-{month
     return ds
  
 
-def computeClimAnl(da, year_rng, moving_avg_days):
+def computeClimAnl(da, year_rng, moving_avg_days, vertical_layers_needed=None):
 
     varname = da.name
 
@@ -43,12 +43,9 @@ def computeClimAnl(da, year_rng, moving_avg_days):
 
     has_z = "ocn_z" in da.dims
    
-    if has_z:
-        da = da.isel(ocn_z=slice(0, 20))
+    if has_z and vertical_layers_needed is not None:
+        da = da.isel(ocn_z=slice(0, vertical_layers_needed))
  
-    #print(da.dims , "=> ", has_z)
-
-
     lat = da.coords["lat"]
     lon = da.coords["lon"]
     
@@ -61,10 +58,6 @@ def computeClimAnl(da, year_rng, moving_avg_days):
 
     else:
         dims = ["time", "lat", "lon"]
-        
-
-   
-
  
     # mean
     if has_z:
@@ -95,24 +88,29 @@ def computeClimAnl(da, year_rng, moving_avg_days):
     )
  
     _da_ttl = _da_anom.copy()
-    full_data = np.asfortranarray(da.to_numpy())
-    
-    if has_z:
-        iter_rng = ( range(len(ocn_z)), range(len(lat)), range(len(lon)) )
-    else:
-        iter_rng = ( range(len(lat)), range(len(lon)) )
- 
+
+
+    xs = da.to_numpy()
+    tm, xm, xa, cnt, _ = anomalies.decomposeClimAnom_MovingAverage_all(ts, xs, n=moving_avg_days)
+
+
+    _da_mean.values[:] = xm[:]
+    _da_anom.values[:] = xa[:]
+    _da_ttl.values[:]  = xs[:]
+
+
+    """    
     for idx in itertools.product(*iter_rng):
         
         full_idx = (slice(None), *idx)
 
         xs = full_data[full_idx]
-        tm, xm, xa, cnt, _ = anomalies.decomposeClimAnom_MovingAverage(ts, xs, n=moving_avg_days)
+        tm, xm, xa, cnt, _ = anomalies.decomposeClimAnom_MovingAverage_all(ts, xs, n=moving_avg_days)
 
         _da_mean.values[full_idx] = xm
         _da_anom.values[full_idx] = xa[:]
         _da_ttl.values[full_idx]  = xs[:]
-
+    """
     return _da_mean, _da_anom, _da_ttl
 
 
@@ -124,6 +122,7 @@ def main(
     input_dir,
     output_dir,
     overwrite=False,
+    vertical_layers_needed=None,
 ):
     print("Processing varname", varname)
 
@@ -155,13 +154,12 @@ def main(
     # Compute mean and anomaly
     print("Computate climate and anomalies for variable `%s`" % (varname,))
     timer_beg= time.time()
-    da_clim, da_anom, da_ttl = computeClimAnl(da, year_rng, moving_avg_days)
+    da_clim, da_anom, da_ttl = computeClimAnl(da, year_rng, moving_avg_days, vertical_layers_needed=vertical_layers_needed)
     timer_end = time.time()
     print("Computational time for variable `%s`: %.1f min" % (
         varname,
         (timer_end - timer_beg) / 60.0,
     ))
-
 
     print("Output file 1: ", filename_ttl)
     print("Output file 2: ", filename_clim)
@@ -179,6 +177,7 @@ def distributedWork(details):
     moving_avg_days = details["moving_avg_days"]
     input_dir = Path(details["input_dir"])
     output_dir = Path(details["output_dir"])
+    vertical_layers_needed = details["vertical_layers_needed"]
 
 
     detect_phase = details["detect_phase"]
@@ -215,6 +214,7 @@ def distributedWork(details):
             moving_avg_days,
             input_dir,
             output_dir,
+            vertical_layers_needed=vertical_layers_needed,
             overwrite=True,
         )
         
@@ -244,12 +244,16 @@ if __name__ == "__main__":
     parser.add_argument('--year-rng',   type=int, nargs=2, help='Year', required=True)
     parser.add_argument('--input-dir', type=str, help='Input file', required=True)
     parser.add_argument('--output-dir', type=str, help='Output directory', required=True)
+    parser.add_argument('--vertical-layers-needed', type=int, help='how many vertical layers needed?', default=None)
     parser.add_argument('--ncpu', type=int, help='Number of CPUs.', default=4)
     parser.add_argument('--moving-avg-days', type=int, help='Number of days to do moving average. It has to be an odd number.', default=15)
     args = parser.parse_args()
 
     print(args)
     #                print("[%04d] File '%s' already exists. Skip." % (self.year, target_fullname, ))
+
+    if args.vertical_layers_needed == -1:
+        args.vertical_layers_needed = None
 
     input_args = []
 
@@ -277,6 +281,7 @@ if __name__ == "__main__":
             input_dir = args.input_dir,
             output_dir = args.output_dir,
             detect_phase = True,
+            vertical_layers_needed = args.vertical_layers_needed,
         )
 
         result = distributedWork(details)

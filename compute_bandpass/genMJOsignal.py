@@ -6,7 +6,7 @@ import traceback
 from pathlib import Path
 import argparse
 import pandas as pd
-
+import time as timeModule
 import bandpass_tools
 
 def makeMJOsignal(
@@ -20,8 +20,13 @@ def makeMJOsignal(
     
     ds = xr.open_dataset(input_file)
     da = ds[varname]
-    
-    da = da.transpose("lat", "lon", "time")
+  
+    has_z = "ocn_z" in da.dims
+
+    if has_z:
+        da = da.transpose("ocn_z", "lat", "lon", "time")
+    else:
+        da = da.transpose("lat", "lon", "time")
     
     time = pd.DatetimeIndex(da.coords["time"][0:2].to_numpy())
     sampling_interval = (time[1] - time[0]) / time_unit
@@ -36,14 +41,26 @@ def makeMJOsignal(
     raw_data = da.to_numpy()
     raw_shape = raw_data.shape
     raw_data = np.reshape( raw_data, (-1, len(da.coords["time"])) )
-    
+   
+    print("Start doing bandpass for variable `%s`" % (varname,)) 
+    timer_beg= timeModule.time()
     new_data = bandpass_tools.bandpass(raw_data, sampling_interval, period_rng)
     new_data = np.reshape(new_data, raw_shape)
+    timer_end = timeModule.time()
+    print("Computational time for variable `%s`: %.1f min" % (
+        varname,
+        (timer_end - timer_beg) / 60.0,
+    ))
+
     
     da_new = da.copy().load()
     da_new.values[:] = new_data[:]
+ 
+    if has_z:
+        da_new = da_new.transpose("time", "ocn_z", "lat", "lon")
+    else:
+        da_new = da_new.transpose("time", "lat", "lon")
   
-    da_new = da_new.transpose("time", "lat", "lon") 
     print("Writing to file: ", output_file) 
     da_new.to_netcdf(output_file)
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source 00_setup.sh
+source 000_setup.sh
 source 999_trapkill.sh
 
 source tools/pretty_latlon.sh
@@ -8,14 +8,19 @@ source tools/pretty_latlon.sh
 
 nproc=10
 
-dataset=1993-2017_31S-31N-n31_100E-100W-n80
+dataset=1993-2016_31S-31N-n31_100E-100W-n80
 
-input_root=$gendata_dir/anomalies/$dataset
-output_root=$gendata_dir/bandpass/$dataset
+input_root=$gendata_dir/anomalies/$dataset/1993-2016
+output_root=$gendata_dir/bandpass/$dataset/1993-2016
 
 mkdir -p $output_root
 
 params=(
+
+    SALT
+    THETA
+    Ue
+    Vn
 
     EXFpreci
 
@@ -40,6 +45,7 @@ params=(
 )
 
 params=(
+    MLT
     THETA
     SALT
     Ue
@@ -53,7 +59,7 @@ for i in $( seq 1 $(( ${#params[@]} / $nparms )) ); do
 
     echo "varname : $varname"
 
-    python3 compute_bandpass/genMJOsignal.py \
+    time python3 compute_bandpass/genMJOsignal.py \
         --varname    $varname                \
         --input-dir  $input_root              \
         --output-dir $output_root          &
