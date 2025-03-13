@@ -12,7 +12,8 @@ zeta1 = 0.06
 zeta2 = 20.0    
 Omega = (2*np.pi)/86164
 
-ECCO_root_dir = "data/ECCO_LLC"
+ECCO_root_dir = "dataset/ECCO_LLC"
+
 ECCO_grid_dir = "ECCO_L4_GEOMETRY_LLC0090GRID_V4R4"
 ECCO_grid_filename = "GRID_GEOMETRY_ECCO_V4r4_native_llc0090.nc"
 
@@ -81,7 +82,7 @@ ECCO_mapping = {
 
     "POSTPROC_ADV_TERMS" : {
         "fileprefix": "ADV",
-        "varnames": ["HADV_g", "HADV_ag", "VADV", "U_g", "V_g", "U_ag", "V_ag"],
+        "varnames": ["HADV_g", "HADV_ag", "VADV", "U_g", "V_g", "U_ag", "V_ag", "Ue", "Vn"],
     },
 
 
@@ -219,7 +220,7 @@ def loadECCOData_continuous(
         for varname in snp_varnames:
 
             dirname, filename = getECCOFilename(varname, "SNAPSHOT", _now_datetime)
-            fullpath = "data/ECCO_LLC/%s/%s" % (dirname, filename)
+            fullpath = "%s/%s/%s" % (ECCO_root_dir, dirname, filename)
 
             if not os.path.isfile(fullpath):
                 raise Exception("File %s does not exist." % (fullpath,))
@@ -236,7 +237,7 @@ def loadECCOData_continuous(
         for varname in ave_varnames:
 
             dirname, filename = getECCOFilename(varname, "DAILY", _now_datetime)
-            fullpath = "data/ECCO_LLC/%s/%s" % (dirname, filename)
+            fullpath = "%s/%s/%s" % (ECCO_root_dir, dirname, filename)
             if not os.path.isfile(fullpath):
                 raise Exception("File %s does not exist." % (fullpath,))
 

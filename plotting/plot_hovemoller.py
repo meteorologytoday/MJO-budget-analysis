@@ -21,16 +21,41 @@ def getIfExists(d, k, default=None):
     return result
         
 
-
-
-
 plot_infos = dict(
     ttr = dict(
         label = "OLR",
         unit = "$\\mathrm{W} \\cdot \\mathrm{m}^{-2}$",
         levs = np.linspace(-1, 1, 21) * 50,
-        factor = -1/3600,
-    )
+        factor = - 3600,
+    ),
+
+    MLT = dict(
+        label = "SST",
+        unit = "$\\mathrm{K}$",
+        levs = np.linspace(-1, 1, 21) * 0.5,
+        factor = 1,
+    ),
+
+    dMLTdt = dict(
+        label = "$\\partial \\mathrm{SST} / \\partial t$",
+        unit = "$1 \\times 10^{-6} \\mathrm{K}\\cdot\\mathrm{s}^{-1}$",
+        levs = np.linspace(-1, 1, 21) * 1,
+        factor = 1e-6,
+    ),
+
+    EXFpreci = dict(
+        label = "Precipitation",
+        unit = "$1 \\mathrm{mm} \\cdot \\mathrm{day}^{-1}$",
+        levs = np.linspace(-1, 1, 21) * 5,
+        factor = 1e-3 / 86400,
+        
+        ttl = dict(
+            levs = np.linspace(0, 1, 21) * 30,
+            cmap = "cmo.rain",
+        ),
+    ),
+
+
 )
 
 parser = argparse.ArgumentParser(
@@ -41,9 +66,15 @@ parser = argparse.ArgumentParser(
 parser.add_argument('--input-file', type=str, help='Input file', required=True)
 parser.add_argument('--varname', type=str, required=True)
 parser.add_argument('--output', type=str, help='Output file', default="")
+parser.add_argument('--filtered-type', type=str, help='Output file', choices=["anomalies", "bandpass", "ttl"], required=True)
+
+parser.add_argument('--show-title', action="store_true")
+parser.add_argument('--show-numbering', action="store_true")
+parser.add_argument('--numbering', type=int, default=1)
+parser.add_argument('--numbering-list', type=str, default="abcdefghijklmn")
 
 parser.add_argument('--time-rng', type=str, nargs=2, help='Output file')
-parser.add_argument('--lon-rng', type=float, nargs=2, help='Output file')
+parser.add_argument('--lon-rng', type=float, nargs=2, help='Output file', default=None)
 parser.add_argument('--lat-rng', type=float, nargs=2, help='Output file')
 parser.add_argument('--aspect-ratio', type=float, help='Height / width', default=2.0)
 parser.add_argument('--no-display', action="store_true")
@@ -87,6 +118,7 @@ import matplotlib.transforms as transforms
 from matplotlib.dates import DateFormatter
 import matplotlib.ticker as mticker
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
+import cmocean as cmo
 
 print("done")
 
@@ -102,9 +134,9 @@ figsize, gridspec_kw = tool_fig_config.calFigParams(
     wspace = 1.0,
     hspace = 0.5,
     w_left = 1.0,
-    w_right = 1.0,
-    h_bottom = 2.0,
-    h_top = 1.0,
+    w_right = 1.5,
+    h_bottom = 0.7,
+    h_top = 0.5,
     ncol = ncol,
     nrow = nrow,
 )
@@ -126,30 +158,63 @@ ax_flatten = ax.flatten()
 #cmap.set_under("yellow")
 factor = getIfExists(plot_info, "factor", 1)
 
+
+if args.filtered_type == "ttl":
+    levs = getIfExists(plot_info["ttl"], "levs")
+    cmap = getIfExists(plot_info["ttl"], "cmap")
+else:
+    levs = getIfExists(plot_info, "levs")
+    cmap = getIfExists(plot_info, "cmap", "bwr")
+   
+
 _ax = ax_flatten[0]
 coords = da.coords
 
 
-_d = da.to_numpy() * factor
+_d = da.to_numpy() / factor
 mappable = _ax.contourf(
     coords["lon"], coords["time"],
     _d,
-    levels=plot_info["levs"],
-    cmap="bwr",
+    levels=levs,
+    cmap=cmap,
     extend="both",
 )
 
-cax = tool_fig_config.addAxesNextToAxes(fig, _ax, "bottom", thickness=0.03, spacing=0.07)
-cb = plt.colorbar(mappable, cax=cax, orientation="horizontal", pad=0.00)
+cax = tool_fig_config.addAxesNextToAxes(fig, _ax, "right", thickness=0.03, spacing=0.05)
+cb = plt.colorbar(mappable, cax=cax, orientation="vertical", pad=0.00)
 
-cb.ax.set_xlabel("%s [%s]" % (plot_info["label"], plot_info["unit"]), size=15)
+cb.ax.set_ylabel("%s [%s]" % (plot_info["label"], plot_info["unit"]), size=15)
+
+if args.lon_rng is not None:
+    _ax.set_xlim(args.lon_rng)
+
+lon_rng = _ax.get_xlim()
+print("lon_rng = ", lon_rng)
+
+
+spacing = 60
+first_tick = np.ceil(lon_rng[0] / spacing) * spacing 
+last_tick  = np.floor(lon_rng[1] / spacing) * spacing 
+_ax.set_xticks(np.arange(first_tick, last_tick+spacing, spacing))
 
 if args.reverse_time:
     
     _ax.invert_yaxis()
 
 _ax.grid()    
-#_ax.set_title("label")
+_ax.set_xlabel("Longitude [degree east]")
+
+if args.show_title:
+    
+    title = "%s" % plot_info["label"]
+    if args.show_numbering:
+        title = "(%s) %s" % (
+            args.numbering_list[args.numbering-1],
+            title,
+        )
+
+    _ax.set_title(title)
+
 
 if not args.no_display:
     plt.show()

@@ -9,6 +9,7 @@ from pathlib import Path
 import argparse
 import pandas as pd
 import re
+import time
 
 def loadDatasets(input_dir, years, file_fmt="ocean_budget_stat_{year:04d}-{month:02d}.nc", data_vars="all"):
     
@@ -40,36 +41,68 @@ def computeClimAnl(da, year_rng, moving_avg_days):
     if not np.all( [needed_dt == _ts for needed_dt, _ts in zip(needed_dts, ts) ] ):
         raise Exception("Loaded data has different time than expected")
 
+    has_z = "ocn_z" in da.dims
+   
+    if has_z:
+        da = da.isel(ocn_z=slice(0, 20))
+ 
+    #print(da.dims , "=> ", has_z)
+
+
     lat = da.coords["lat"]
     lon = da.coords["lon"]
+    
+    coords = dict(lat=lat, lon=lon)
+    ocn_z = None
+    if has_z:
+        ocn_z = da.coords["ocn_z"]
+        coords["ocn_z"] = ocn_z
+        dims = ["time", "ocn_z", "lat", "lon"]
 
+    else:
+        dims = ["time", "lat", "lon"]
+        
+
+   
+
+ 
+    # mean
+    if has_z:
+        shape = (len(tm), len(ocn_z), len(lat), len(lon))    
+    else:
+        shape = (len(tm), len(lat), len(lon))    
+
+    coords["time"] = tm
     _da_mean = xr.DataArray(
         name = varname,
-        data = np.zeros((len(tm), len(lat), len(lon))),
-        dims = ["time", "lat", "lon"],
-        coords = {
-            "time" : tm,
-            "lat"  : lat,
-            "lon"  : lon,
-        }
+        data = np.zeros(shape),
+        dims = dims,
+        coords = coords,
     )
- 
+
+    # anom 
+    if has_z:
+        shape = (len(ts), len(ocn_z), len(lat), len(lon))    
+    else:
+        shape = (len(ts), len(lat), len(lon))    
+
+    coords["time"] = ts
     _da_anom = xr.DataArray(
         name = varname,
-        data = np.zeros((len(ts), len(lat), len(lon))),
-        dims = ["time", "lat", "lon"],
-        coords = {
-            "time" : ts,
-            "lat"  : lat,
-            "lon"  : lon,
-        }
+        data = np.zeros(shape),
+        dims = dims,
+        coords = coords,
     )
  
     _da_ttl = _da_anom.copy()
-            
-    #print("da.to_numpy()")
-    full_data = da.to_numpy()
-    for idx in itertools.product(range(len(lat)), range(len(lon))):
+    full_data = np.asfortranarray(da.to_numpy())
+    
+    if has_z:
+        iter_rng = ( range(len(ocn_z)), range(len(lat)), range(len(lon)) )
+    else:
+        iter_rng = ( range(len(lat)), range(len(lon)) )
+ 
+    for idx in itertools.product(*iter_rng):
         
         full_idx = (slice(None), *idx)
 
@@ -120,7 +153,15 @@ def main(
     #MLG_nonfrc = (ds['MLG_adv'] + ds['MLG_hdiff'] + ds['MLG_vdiff'] + ds['MLG_ent_wep'] + ds['MLG_ent_wen']).rename('MLG_nonfrc')
 
     # Compute mean and anomaly
+    print("Computate climate and anomalies for variable `%s`" % (varname,))
+    timer_beg= time.time()
     da_clim, da_anom, da_ttl = computeClimAnl(da, year_rng, moving_avg_days)
+    timer_end = time.time()
+    print("Computational time for variable `%s`: %.1f min" % (
+        varname,
+        (timer_end - timer_beg) / 60.0,
+    ))
+
 
     print("Output file 1: ", filename_ttl)
     print("Output file 2: ", filename_clim)

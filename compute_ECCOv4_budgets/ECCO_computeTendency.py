@@ -247,6 +247,8 @@ def computeTendencyAdv(target_datetime):
     HADV_ag = HADV_ag.where(ecco_grid.maskC)
     VADV    = VADV.where(ecco_grid.maskC)
 
+    Ue = U * ecco_grid['CS'] - V * ecco_grid['SN']
+    Vn = U * ecco_grid['SN'] + V * ecco_grid['CS']
 
     Ue_g = U_g * ecco_grid['CS'] - V_g * ecco_grid['SN']
     Vn_g = U_g * ecco_grid['SN'] + V_g * ecco_grid['CS']
@@ -254,6 +256,9 @@ def computeTendencyAdv(target_datetime):
     Ue_ag = U_ag * ecco_grid['CS'] - V_ag * ecco_grid['SN']
     Vn_ag = U_ag * ecco_grid['SN'] + V_ag * ecco_grid['CS']
 
+
+    Ue = Ue.rename("Ue")
+    Vn = Vn.rename("Vn")
 
     Ue_g = Ue_g.rename("Ue_g")
     Vn_g = Vn_g.rename("Vn_g")
@@ -263,6 +268,7 @@ def computeTendencyAdv(target_datetime):
 
 
     new_ds = xr.merge([
+         Ue, Vn,
         Ue_g, Vn_g, Ue_ag, Vn_ag,
          U_g,  V_g,  U_ag,  V_ag, 
         HADV_g, HADV_ag, 

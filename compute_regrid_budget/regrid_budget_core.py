@@ -17,9 +17,13 @@ import xarray as xr
 import ECCO_helper
 import regrid_tools
 
-ERA_varnames = ["ttr",]
+ERA_varnames = ["tp", "ttr",]
 
 ECCO_varnames = [
+    "THETA",
+    "SALT",
+    "Ue",
+    "Vn",
     "dMLTdt",
     "MLT",
     "MXLDEPTH",
@@ -59,9 +63,14 @@ ECCO_varnames = [
     "EXFroff",
 ]
 
+ECCO_3D_varnames = ["THETA", "SALT", ]
+
+ERA5_3D_varnames = []
+
 
 ERA5_short2long_mapping = {
     "ttr" : "top_net_thermal_radiation",
+    "tp"  : "total_precipitation",
 }
 
 def weightedAvg(var_data, wgts):
@@ -133,6 +142,7 @@ def main(
     dts = pd.date_range(beg_date, end_date, freq="D", inclusive="left")
     total_days = len(dts)
 
+    """
     ECCO_varnames = [
         "dMLTdt",
         "MLT",
@@ -172,7 +182,7 @@ def main(
         "EXFevap",
         "EXFroff",
     ]
-
+    """
     tendency_residue_tolerance = 1e-10
 
     domain_check_tolerance = 1e-10
@@ -183,6 +193,7 @@ def main(
 
     lat = None
     lon = None
+    ocn_z   = None
     f_co = None
 
     computed_LLC_vars  = ["dTdz_b_over_h", "MLG_residue",]
@@ -199,9 +210,7 @@ def main(
     regrid_info_ECCO = regrid_tools.loadRegridInfo(regrid_file_ECCO)
     regrid_info_ERA5 = regrid_tools.loadRegridInfo(regrid_file_ERA5)
 
-    data = {
-        varname : np.zeros((len(dts), len(regrid_info_ECCO["lat"]), len(regrid_info_ECCO["lon"])), dtype=np.float64) for varname in all_varnames
-    }
+    data = dict()
 
     print("Ready to process data.")
     for d, dt in enumerate(dts):
@@ -227,9 +236,24 @@ def main(
                 print("Load `%s` from file: %s" % ( varname, ERA5_filename, ))
                 ds_ERA = xr.open_dataset(ERA5_filename)
                 _var = ds_ERA[load_varname].sel(valid_time = dt)
+                var_is_3D = 'lev' in _var.dims
+                _var_numpy = _var.to_numpy()
                 
-                regridded_var = regrid_tools.regrid( regrid_info_ERA5, _var.to_numpy() )
-                data[load_varname][d, :, :] = regridded_var
+                if load_varname not in data:
+                    if var_is_3D:
+                        dim = (len(dts), _var.sizes["lev"], len(regrid_info_ECCO["lat"]), len(regrid_info_ECCO["lon"]))
+                    else:
+                        dim = (len(dts), len(regrid_info_ECCO["lat"]), len(regrid_info_ECCO["lon"]))
+                    
+                    data[load_varname] = np.zeros(dim, dtype=np.float64)
+
+                 
+                if var_is_3D:
+                    pass
+                else:
+                    regridded_var = regrid_tools.regrid( regrid_info_ERA5, _var_numpy )
+                    data[load_varname][d, :, :] = regridded_var
+
                 #print("ERA5 shape = ", regridded_var.shape)
             except Exception as e:
 
@@ -266,8 +290,41 @@ def main(
                 ds_ECCO = ds_ECCO.astype(np.float64)
                 _var = ds_ECCO[varname]
 
-                regridded_var = regrid_tools.regrid( regrid_info_ECCO, _var.to_numpy() )
-                data[varname][d, :, :] = regridded_var
+                # Test if 3D
+                var_is_3D = 'k' in _var.dims
+                _var_numpy = _var.to_numpy()
+                #print(_var_numpy.shape)
+
+
+                #if varname == "VVEL":
+                #    _var_numpy = (_var_numpy[:, :, 1:, :] + _var_numpy[:, :, :-1, :] )  / 2
+
+                #if varname == "UVEL":
+                #    _var_numpy = (_var_numpy[:, :, :, 1:] + _var_numpy[:, :, :, :-1] )  / 2
+
+
+
+                if var_is_3D and ocn_z is None:
+                    ocn_z = _var.coords["Z"].to_numpy()
+
+
+                if varname not in data:
+                    if var_is_3D:
+                        dim = (len(dts), _var.sizes["k"], len(regrid_info_ECCO["lat"]), len(regrid_info_ECCO["lon"]))
+                    else:
+                        dim = (len(dts), len(regrid_info_ECCO["lat"]), len(regrid_info_ECCO["lon"]))
+                    
+                    data[varname] = np.zeros(dim, dtype=np.float64)
+
+                 
+                if var_is_3D:
+                    for k in range(_var.sizes['k']):
+                        regridded_var = regrid_tools.regrid( regrid_info_ECCO, _var_numpy[k, :, :, :] )
+                        data[varname][d, k, :, :] = regridded_var
+                else:
+                        regridded_var = regrid_tools.regrid( regrid_info_ECCO, _var_numpy )
+                        data[varname][d, :, :] = regridded_var
+                    
                 #if np.all(regridded_var == 0):
                 #    print("!!!!!!!!!!!!!!!!!!!!!!! all zero for varname", varname)
                 
@@ -309,7 +366,7 @@ def main(
         for i, missing_date in enumerate(missing_dates):
             print("[%d] Missing date needed: %s" % (i, missing_date.strftime("%Y-%m-%d"),))
 
-        missing_date_file = output_dir / "missing_dates_%d.txt" % (year,)
+        missing_date_file = output_dir / ("missing_dates_%d.txt" % (year,))
         
         print("Output missing date file: %s" % (missing_date_file,))
         with open(missing_date_file, "w") as f:
@@ -323,18 +380,28 @@ def main(
 
     for varname, arr in data.items():
         print(varname, " => ", arr.shape)
-        data_vars[varname] = (["time", "lat", "lon"], arr)
+        dim = None
+        if len(arr.shape) == 3:
+            dim = ["time", "lat", "lon"]
+        elif len(arr.shape) == 4:
+            dim = ["time", "ocn_z", "lat", "lon"]
+            
+        data_vars[varname] = (dim, arr)
   
     print("lat => ", regrid_info_ERA5["lat"].shape) 
     print("lon => ", regrid_info_ERA5["lon"].shape) 
-     
+    coords = dict(
+        time = (["time"], dts),
+        lat = (["lat"], regrid_info_ERA5["lat"]),
+        lon = (["lon"], regrid_info_ERA5["lon"]),
+    )
+
+    if ocn_z is not None: 
+        coords["ocn_z"] = (["ocn_z"], ocn_z)
+
     output_ds = xr.Dataset(
         data_vars = data_vars,
-        coords = dict(
-            time = (["time"], dts),
-            lat = (["lat"], regrid_info_ERA5["lat"]),
-            lon = (["lon"], regrid_info_ERA5["lon"]),
-        ),
+        coords = coords,
     )
 
     print("Merge data_good into each dataset")

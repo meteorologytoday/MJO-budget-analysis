@@ -1,15 +1,15 @@
 #!/bin/bash
 
-source 00_setup.sh
+source 000_setup.sh
 source tools/pretty_latlon.sh
 
-nproc=4
+nproc=10
 
 
 output_root=$gendata_dir/regrid
 
 beg_year=1993
-end_year=2017
+end_year=2016
 
 # format: lat_m lat_M lon_m lon_M lat_nbox lon_nbox
 spatial_rngs=(
@@ -29,12 +29,12 @@ mkdir -p mask
 
 if [ ! -f "$mask_ECCO" ]; then
     echo "Mask file $mask_ECCO does not exist. Generating now..."
-    python3 make_mask_ECCO.py
+    #python3 make_mask_ECCO.py
 fi
 
 if [ ! -f "$mask_ERAinterim" ]; then
     echo "Mask file $mask_ERA5 does not exist. Generating now..."
-    python3 make_mask_ERA5.py
+    #python3 make_mask_ERA5.py
 fi
 
 for i in $( seq 1 $(( ${#spatial_rngs[@]} / $nparms )) ); do

@@ -1,6 +1,11 @@
-with open("shared_header.py", "rb") as source_file:
-    code = compile(source_file.read(), "shared_header.py", "exec")
-exec(code)
+from multiprocessing import Pool
+import multiprocessing
+import datetime
+from pathlib import Path
+import os.path
+import os
+import netCDF4
+
 import pandas as pd
 import numpy as np
 import argparse
@@ -8,6 +13,15 @@ import ECCO_helper, ECCO_computeTendency
 import xarray as xr
 import postprocess_ECCO_tools
 import traceback
+
+def pleaseRun(cmd):
+    print(">> %s" % cmd)
+    os.system(cmd)
+
+beg_time = datetime.datetime(1992,     1, 1)
+end_time = datetime.datetime(2018,     1, 1)
+
+g0 = 9.81
 
 parser = argparse.ArgumentParser(
                     prog = 'postprocess_ECCO.py',
@@ -19,7 +33,7 @@ parser.add_argument('--nproc', type=int, default=2)
 args = parser.parse_args()
 print(args)
 
-output_root_dir = "data/ECCO_LLC"
+output_root_dir = "dataset/ECCO_LLC"
 
 MLD_dev = 0.03
 
@@ -45,7 +59,7 @@ def ifSkip(dt):
 
 
 
-def work(dt, output_filename_G_terms, output_filename_MXLANA):
+def work(dt, output_filename_G_terms, output_filename_MXLANA, output_filename_ADV):
 
     result = dict(status="OK", dt=dt, target_files = [output_filename_G_terms, output_filename_MXLANA])
   
@@ -75,7 +89,6 @@ def work(dt, output_filename_G_terms, output_filename_MXLANA):
         ds.to_netcdf(output_filename_G_terms, format='NETCDF4')
         ds.close()
            
-        """
         # Phase 2
         # This one computes the advection. Does not depend on MLD_method.
         _tmp = ECCO_helper.getECCOFilename("HADV_g", "DAILY", dt)
@@ -95,7 +108,6 @@ def work(dt, output_filename_G_terms, output_filename_MXLANA):
             ds = ECCO_computeTendency.computeTendencyAdv(dt)
             print("Output: ", output_filename_ADV)
             ds.to_netcdf(output_filename_ADV, format='NETCDF4')
-        """
 
         # Phase 3
         # This one computes the mixed-layer integrated quantities
@@ -139,7 +151,7 @@ def work(dt, output_filename_G_terms, output_filename_MXLANA):
 
 failed_dates = []
     
-dts = pd.date_range(beg_time.strftime("%Y-%m-%d"), end_time.strftime("%Y-%m-%d"), inclusive="both")
+dts = pd.date_range(beg_time.strftime("%Y-%m-%d"), end_time.strftime("%Y-%m-%d"), inclusive="left")
 input_args = []
 for dt in dts:
 
@@ -168,16 +180,20 @@ for dt in dts:
     _tmp = ECCO_helper.getECCOFilename("MLT", "DAILY", dt, extra_dirsuffix=extra_dirsuffix)
     output_filename_MXLANA = "%s/%s/%s" % (output_root_dir, _tmp[0], _tmp[1])
 
+    _tmp = ECCO_helper.getECCOFilename("Ue", "DAILY", dt, extra_dirsuffix=extra_dirsuffix)
+    output_filename_ADV = "%s/%s/%s" % (output_root_dir, _tmp[0], _tmp[1])
+
+
     all_exists = True
 
-    for output_filename in [output_filename_G_terms, output_filename_MXLANA]:
+    for output_filename in [output_filename_G_terms, output_filename_MXLANA, output_filename_ADV]:
         if not os.path.isfile(output_filename):
             all_exists = False
 
     if all_exists:        
         print("[%s] File all exists. Skip." % (time_now_str, ))
     else:
-        input_args.append((dt, output_filename_G_terms, output_filename_MXLANA))
+        input_args.append((dt, output_filename_G_terms, output_filename_MXLANA, output_filename_ADV))
         
 
 

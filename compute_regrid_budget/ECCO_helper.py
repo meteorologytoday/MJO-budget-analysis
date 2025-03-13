@@ -81,7 +81,7 @@ ECCO_mapping = {
 
     "POSTPROC_ADV_TERMS" : {
         "fileprefix": "ADV",
-        "varnames": ["HADV_g", "HADV_ag", "VADV", "U_g", "V_g", "U_ag", "V_ag"],
+        "varnames": ["HADV_g", "HADV_ag", "VADV", "U_g", "V_g", "U_ag", "V_ag", "Ue", "Vn"],
     },
 
 
