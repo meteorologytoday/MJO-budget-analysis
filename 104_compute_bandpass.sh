@@ -10,18 +10,14 @@ nproc=10
 
 dataset=1993-2016_31S-31N-n31_100E-100W-n80
 
-input_root=$gendata_dir/anomalies/$dataset/1993-2016
-output_root=$gendata_dir/bandpass/$dataset/1993-2016
+input_root=$gendata_dir/$dataset/1993-2016/anom
+output_root=$gendata_dir/$dataset/1993-2016/
 
 mkdir -p $output_root
 
 params=(
 
-    SALT
-    THETA
-    Ue
-    Vn
-
+    MLG_vmixall
     EXFpreci
 
     MLT
@@ -42,36 +38,43 @@ params=(
     MLG_ent_wen
 
     ttr
-)
 
-params=(
     MLT
     THETA
     SALT
     Ue
     Vn
+
 )
 
 nparms=1
-for i in $( seq 1 $(( ${#params[@]} / $nparms )) ); do
 
-    varname=${params[$(( ( i - 1 ) * $nparms + 0 ))]}
-
-    echo "varname : $varname"
-
-    time python3 compute_bandpass/genMJOsignal.py \
-        --varname    $varname                \
-        --input-dir  $input_root              \
-        --output-dir $output_root          &
-
-    cnt=$(( $cnt + 1))
+for bandpass_algo in mavg lanczos hat ; do
     
-    if (( $cnt >= $nproc )) ; then
-        echo "Max cpu usage reached: $nproc"
-        wait
-        cnt=0
-    fi 
+    output_dir=$output_root/bandpass-$bandpass_algo
+    mkdir -p $output_dir
+    
+    for i in $( seq 1 $(( ${#params[@]} / $nparms )) ); do
 
+        varname=${params[$(( ( i - 1 ) * $nparms + 0 ))]}
+
+        echo "varname : $varname"
+
+        time python3 compute_bandpass/genMJOsignal.py \
+            --varname    $varname                  \
+            --input-dir  $input_root               \
+            --output-dir $output_dir \
+            --bandpass-algo $bandpass_algo &
+
+        cnt=$(( $cnt + 1))
+        
+        if (( $cnt >= $nproc )) ; then
+            echo "Max cpu usage reached: $nproc"
+            wait
+            cnt=0
+        fi 
+
+    done
 done
 
 wait

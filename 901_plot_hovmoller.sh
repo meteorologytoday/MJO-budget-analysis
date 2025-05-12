@@ -1,23 +1,23 @@
 #!/bin/bash
 
-source 00_setup.sh
+source 000_setup.sh
 
 input_root=$gendata_dir
-dataset=1993-2017_31S-31N-n31_100E-100W-n80
+dataset=1993-2016_31S-31N-n31_100E-100W-n80/1993-2016
 output_root=$fig_dir/hovmoeller
     
 mkdir -p $output_root
 
 params=(
-#    ttr     bandpass   2015-10-01 2016-03-01 -5 5 30 270
+    ttr     bandpass   2015-10-01 2016-03-01 -3 3 30 270
 #    dMLTdt  bandpass   2015-10-01 2016-03-01 -5 5 30 270
-    EXFpreci ttl  2015-10-01 2016-03-01 -5 5 30 270
-    EXFpreci anomalies  2015-10-01 2016-03-01 -5 5 30 270
-    EXFpreci bandpass  2015-10-01 2016-03-01 -5 5 30 270
-    MLT     bandpass   2015-10-01 2016-03-01 -5 5 30 270
+#    EXFpreci ttl  2015-10-01 2016-03-01 -5 5 30 270
+#    EXFpreci anomalies  2015-10-01 2016-03-01 -5 5 30 270
+#    EXFpreci bandpass  2015-10-01 2016-03-01 -5 5 30 270
+#    MLT     bandpass   2015-10-01 2016-03-01 -5 5 30 270
 
-    ttr     anomalies  2015-10-01 2016-03-01 -5 5 30 270
-    dMLTdt  anomalies  2015-10-01 2016-03-01 -5 5 30 270
+#    ttr     anomalies  2015-10-01 2016-03-01 -5 5 30 270
+#    dMLTdt  anomalies  2015-10-01 2016-03-01 -5 5 30 270
 #    MLT     anomalies  2015-05-01 2016-03-01 -5 5 30 270
 )
 
@@ -37,13 +37,7 @@ for i in $( seq 1 $(( ${#params[@]} / $nparms )) ); do
     output_dir=$output_root/$filtered_type
 
 
-    bad_naming=$filtered_type
-
-    if [ "$filtered_type" = "ttl" ] ; then
-        bad_naming="anomalies"
-    fi
-
-    input_file=$input_root/$bad_naming/$dataset/${filtered_type}_${varname}.nc
+    input_file=$input_root/$dataset/$filtered_type/${filtered_type}_${varname}.nc
     output_file=$output_dir/hov-${filtered_type}_${varname}_${time_beg}_to_${time_end}.png
 
     echo "varname       : $varname"

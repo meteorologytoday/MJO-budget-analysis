@@ -3,7 +3,7 @@
 source 000_setup.sh
 source tools/pretty_latlon.sh
 
-nproc=10
+nproc=5
 
 
 output_root=$gendata_dir/regrid

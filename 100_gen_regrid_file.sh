@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source 00_setup.sh
+source 000_setup.sh
 
 
 

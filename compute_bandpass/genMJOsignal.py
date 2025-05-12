@@ -7,12 +7,14 @@ from pathlib import Path
 import argparse
 import pandas as pd
 import time as timeModule
-import bandpass_tools
+#import bandpass_tools
+import lanczos_filtering
 
 def makeMJOsignal(
     input_file,
     output_file,
     varname,
+    bandpass_algo,
     bandpass_rng = (pd.Timedelta(days=20), pd.Timedelta(days=90)),
 ):
     
@@ -44,7 +46,16 @@ def makeMJOsignal(
    
     print("Start doing bandpass for variable `%s`" % (varname,)) 
     timer_beg= timeModule.time()
-    new_data = bandpass_tools.bandpass(raw_data, sampling_interval, period_rng)
+
+    if bandpass_algo == "lanczos":    
+        new_data = lanczos_filtering.easy_lanczos_filter(raw_data, sampling_interval, lowpass_period=period_rng[0], highpass_period=period_rng[1])
+    elif bandpass_algo == "hat":
+        new_data = lanczos_filtering.easy_hat_filter(raw_data, sampling_interval, lowpass_period=period_rng[0], highpass_period=period_rng[1])
+    elif bandpass_algo == "mavg":
+        lowpass_half_window_size = int(period_rng[0] // 2)
+        highpass_half_window_size = int(period_rng[1] // 2)
+        new_data = lanczos_filtering.mavg_filter(raw_data, highpass_half_window_size = highpass_half_window_size, lowpass_half_window_size = lowpass_half_window_size, )
+    
     new_data = np.reshape(new_data, raw_shape)
     timer_end = timeModule.time()
     print("Computational time for variable `%s`: %.1f min" % (
@@ -76,6 +87,7 @@ if __name__ == "__main__":
     parser.add_argument('--input-dir',  type=str, help='mask file of ERA', required=True)
     parser.add_argument('--output-dir',  type=str, help='mask file of ERA', required=True)
     parser.add_argument('--bandpass-rng',  type=float, help='Bandpass in days', default=[20.0, 90.0])
+    parser.add_argument('--bandpass-algo',  type=str, help='Bandpass in days', required=True, choices=["lanczos", "hat", "mavg"])
     args = parser.parse_args()
 
     print(args)
@@ -83,17 +95,18 @@ if __name__ == "__main__":
 
     varname = args.varname
     input_file  = Path(args.input_dir) / f"anom_{varname:s}.nc"
-    output_file = Path(args.output_dir) / ("bandpass_%s" % str(input_file.name)[5:])
+    output_file = Path(args.output_dir) / ("bandpass-%s_%s" % (args.bandpass_algo, str(input_file.name)[5:],))
 
     #output_dir.mkdir(exist_ok=True, parents=True)
 
     print(f"varname = {varname:s}")
     print("input_file = ", str(input_file))
     print("output_file = ", str(output_file))
+    print("bandpass_algo = ", args.bandpass_algo)
    
     bandpass_rng = [ pd.Timedelta(days=args.bandpass_rng[0]), pd.Timedelta(days=args.bandpass_rng[1]) ]
  
     print("Doing math...")
-    makeMJOsignal(input_file, output_file, varname, bandpass_rng)
+    makeMJOsignal(input_file, output_file, varname, args.bandpass_algo, bandpass_rng)
     print("Done")
     

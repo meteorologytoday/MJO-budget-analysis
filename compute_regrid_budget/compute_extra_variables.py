@@ -45,6 +45,7 @@ if __name__ == "__main__":
         MLG_frc = ( ds['MLG_frc_sw'] + ds['MLG_frc_lw'] + ds['MLG_frc_sh']  + ds['MLG_frc_lh'] + ds['MLG_frc_dilu'] ),
         MLG_vmix = (ds['MLG_vdiff'] + ds['MLG_ent_wep']),
         MLG_nonfrc = (ds['MLG_adv'] + ds['MLG_hdiff'] + ds['MLG_vdiff'] + ds['MLG_ent_wep'] + ds['MLG_ent_wen']),
+        MLG_vmixall = (ds['MLG_vdiff'] + ds['MLG_ent_wep'] + ds['MLG_ent_wen']),
     )
 
     for varname, da in extra_da.items():

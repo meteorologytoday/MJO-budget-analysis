@@ -17,7 +17,7 @@ import xarray as xr
 import ECCO_helper
 import regrid_tools
 
-ERA_varnames = ["tp", "ttr",]
+ERA_varnames = ["tp", "ttr", "u10", "v10"]
 
 ECCO_varnames = [
     "THETA",
@@ -71,6 +71,8 @@ ERA5_3D_varnames = []
 ERA5_short2long_mapping = {
     "ttr" : "top_net_thermal_radiation",
     "tp"  : "total_precipitation",
+    "u10" : "10m_u_component_of_wind",
+    "v10" : "10m_v_component_of_wind",
 }
 
 def weightedAvg(var_data, wgts):

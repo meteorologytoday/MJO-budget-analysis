@@ -7,7 +7,6 @@ nproc=41
 moving_avg_days=31
 
 input_root=$gendata_dir/regrid
-output_root=$gendata_dir/anomalies
 
 params=(
     1993 2016 1993-2016_31S-31N-n31_100E-100W-n80
@@ -22,7 +21,7 @@ for i in $( seq 1 $(( ${#params[@]} / $nparms )) ); do
     dataset=${params[$(( ( i - 1 ) * $nparms + 2 ))]}
 
     input_dir=$input_root/$dataset
-    output_dir=$output_root/$dataset/${beg_year}-${end_year}
+    output_dir=$gendata_dir/$dataset/${beg_year}-${end_year}/anom
 
     echo "beg_year   : $beg_year"
     echo "end_year   : $end_year"

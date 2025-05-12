@@ -51,8 +51,12 @@ selected_dts = pd.date_range(time_beg, time_end, freq="D", inclusive="both")
 data = dict()
 
 for varname in args.varnames:
+    
+    if varname == "BLANK":
+        continue
+    
     print("Loading varname: ", varname)
-    filename = input_dir / f"anom_{varname:s}.nc"
+    filename = input_dir / f"bandpass-lanczos_{varname:s}.nc"
     da = xr.open_dataset(filename)[varname]
     da = da.sel(time=selected_dts).mean(dim="time")
 
@@ -146,6 +150,15 @@ plot_infos = {
         "unit"  : "$ 10^{-6} \\, \\mathrm{K} / \\mathrm{s} $",
         "factor" : 1e-6,
     }, 
+
+    "MLG_vmixall" : {
+        "levs": G_scale,
+        "levs_std": np.linspace(0, 2, 11),
+        "label" : "$ \\dot{\\overline{\\Theta}}_{\\mathrm{vmix}} $",
+        "unit"  : "$ 10^{-6} \\, \\mathrm{K} / \\mathrm{s} $",
+        "factor" : 1e-6,
+    }, 
+
 
 
     "MLG_ent_wen" : {
@@ -446,7 +459,7 @@ for i, varname in enumerate(varnames):
 
     da = data[varname]
     # Set title for different month except for the whole average mon==7
-    _ax.set_title("(%s) %s" % ("abcdefghijklmnopqrstu"[i], plot_info["label"]), size=30)
+    #_ax.set_title("(%s) %s" % ("abcdefghijklmnopqrstu"[i], plot_info["label"]), size=30)
     factor = getIfExists(plot_info, "factor", 1)
 
     _d = da.to_numpy() / factor
@@ -460,7 +473,8 @@ for i, varname in enumerate(varnames):
     )
 
     if args.add_thumbnail_title :
-        _ax.set_title("(%s)" % ("abcdefghijklmnopqrstuvwxyz"[thumbnail_cnt + args.thumbnail_offset]))
+        print("THUMBNAIL_CNT = %d" % (thumbnail_cnt,))
+        _ax.set_title("(%s) %s" % ("abcdefghijklmnopqrstuvwxyz"[thumbnail_cnt + args.thumbnail_offset], plot_info["label"]), size=30)
         thumbnail_cnt += 1
             
 
